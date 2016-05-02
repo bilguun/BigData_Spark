@@ -56,9 +56,13 @@ def mapToNB(parts):
             dropoff_boro = findBr(dropoff_location, br_index, borough)
 
             if pickup_nb!=-1 and dropoff_boro!=-1:
-                yield (dropoff_boro, pickup_nb, 1)
+                yield ((dropoff_boro, pickup_nb), 1)
 
-
+def mapSplitBoroNB(parts):
+    for line in parts:
+        ((dropoff_boro, pickup_nb), cnt) = line
+        yield (dropoff_boro, pickup_nb, cnt)
+                
 if __name__=='__main__':
     if len(sys.argv)<3:
         print "Usage: <input files> <output path>"
@@ -70,18 +74,12 @@ if __name__=='__main__':
 
     output = trips \
         .mapPartitions(mapToNB) \
-        .reduceByKey(add);
+        .reduceByKey(add)\
+        .mapPartitions(mapSplitBoroNB);
     
     sqlContext = SQLContext(sc)
 
-    csv_data = trips.map(lambda l: l.split(","))    
-    
-    row_data = csv_data.map(lambda p: Row(
-            boro=str(p[0]),
-            nb=str(p[1]),
-            cnt=int(p[2])))
-
-    df = sqlContext.createDataFrame(row_data)
+    df = sqlContext.createDataFrame(output, ["boro", "nb", "cnt"])
 
     df.registerTempTable("trips")
 
