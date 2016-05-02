@@ -4,7 +4,8 @@ from operator import add
 import os
 import sys
 import pyspark
-import heapq
+from  pyspark.sql import SQLContext
+from pyspark.sql import Row
  
 def indexZones(shapeFilename):
     import rtree
@@ -55,10 +56,7 @@ def mapToNB(parts):
             dropoff_boro = findBr(dropoff_location, br_index, borough)
 
             if pickup_nb!=-1 and dropoff_boro!=-1:
-                yield ((dropoff_boro, pickup_nb), 1)
-
-#def reduceAdd(p1,p2):
-    
+                yield (dropoff_boro, pickup_nb, 1)
 
 
 if __name__=='__main__':
@@ -74,5 +72,28 @@ if __name__=='__main__':
         .mapPartitions(mapToNB) \
         .reduceByKey(add);
     
-    output.saveAsTextFile(sys.argv[-1])
+    sqlContext = SQLContext(sc)
 
+    csv_data = trips.map(lambda l: l.split(","))    
+    
+    row_data = csv_data.map(lambda p: Row(
+            boro=str(p[0]),
+            nb=str(p[1]),
+            cnt=int(p[2])))
+
+    df = sqlContext.createDataFrame(row_data)
+
+    df.registerTempTable("trips")
+
+    topM = sqlContext.sql("select boro, nb, cnt from trips where boro='Manhattan' order by cnt desc limit 3")#.collect()
+    topB = sqlContext.sql("select boro, nb, cnt from trips where boro='Brooklyn' order by cnt desc limit 3")#.collect()
+    topBx = sqlContext.sql("select boro, nb, cnt from trips where boro='Bronx' order by cnt desc limit 3")#.collect()
+    topS = sqlContext.sql("select boro, nb, cnt from trips where boro='Staten Island' order by cnt desc limit 3")#.collect()
+    topQ = sqlContext.sql("select boro, nb, cnt from trips where boro='Queens' order by cnt desc limit 3")#.collect()
+    
+    topN = topM.unionAll(topB)
+    topN = topM.unionAll(topBx)
+    topN = topM.unionAll(topS)
+    topN = topM.unionAll(topQ) 
+
+    topN.rdd.map(lambda x: ",".join(map(str, x))).coalesce(1).saveAsTextFile(sys.argv[-1])
