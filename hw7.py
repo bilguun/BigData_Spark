@@ -90,8 +90,8 @@ if __name__=='__main__':
     topQ = sqlContext.sql("select boro, nb, cnt from trips where boro='Queens' order by cnt desc limit 3")#.collect()
     
     topN = topM.unionAll(topB)
-    topN = topM.unionAll(topBx)
-    topN = topM.unionAll(topS)
-    topN = topM.unionAll(topQ) 
+    topN = topN.unionAll(topBx)
+    topN = topN.unionAll(topS)
+    topN = topN.unionAll(topQ) 
 
     topN.rdd.map(lambda x: ",".join(map(str, x))).coalesce(1).saveAsTextFile(sys.argv[-1])
